@@ -16,7 +16,6 @@ The objective of this lab is to provide an overview of the main methods to impor
 
 - Part 1: Using & manipulating data from an external source
 - Part 2: Indentifying key housing issues and data gaps
-- Part 3: Using & manipulating data from a government API
 
 BY the end of this lab, the student is expected to have a broad knowledge and basic hands on experience of the methods to import and analyse data relating to housing issues.
 
@@ -25,7 +24,7 @@ BY the end of this lab, the student is expected to have a broad knowledge and ba
 
 Data is comonly first downloaded from an external source and then loaded into R for procesing. This script shows how to load data from an external source and how to process it in order to create outputs (i.e. maps, tables, etc.) that will serve to inform policymaking.
 
-###### Data Source: The Opportunity Insights Project
+###### Loading an external Data Source: The Opportunity Insights Project
 
 Opportunity insights is a not-for-profit organization directed by Prof. Raj Chetty (Harvard University) developed with the aim to **"...identify barriers to economic opportunity..."**. As housing scholars, we know that for a increasingly larger portion of the population, housing is a steping stone over which famkilies can build wealth and create stability and opportunities for their families. Hence much of the barriers to economic opportunities identified in the OI project overlap with the barriers for attaining a health housing situation. In specific the neighborhood dimension of the OI project contains many important findings that can provide useful insights when embarking in a housing analysis journey (see more in: https://opportunityinsights.org/neighborhoods/)
 
@@ -52,14 +51,150 @@ str(d1) # provides a general structure of the data (variable names, type, forst 
 
 summary(d1) # provides a detailed summary statistic by variable (inlcuding the presence of NA's)
 
+class(d1)
+
 ```
 
-## Including Plots
+###### Most common data manipulation operations
 
-You can also embed plots, for example:
+```{r OI data manipulation}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+d1[,table(czname)] # variable exploration - counts
+d1[,.N, by=.(czname)] #alternative
+
+d1[czname=="San Antonio",] # filtering
+
+SA_OI<- d1[czname=="San Antonio",] # filtering + object creation (subsetting)
+
+SA_OI[is.na(hhinc_mean2000),] #identifying cases with NAs
+
+SA_OI<- SA_OI[is.na(hhinc_mean2000)==FALSE,]
+
+SA_OI[, ones:=1] # variable creation
+SA_OI[hhinc_mean2000<=quantile(hhinc_mean2000,probs = 0.5), bellow_medianIncome:=1 ] # variable creation by codition
+SA_OI[is.na(bellow_medianIncome),bellow_medianIncome:=0] # variable value replacement by condition
+
+SA_OI[, med_hhinc_growth1990_2006:=((med_hhinc2016-med_hhinc1990)/med_hhinc1990)*100]# variable creation by a mathematical manipulation of other variables.
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+###### More advanced data manipulation
+
+```{r IO advanced data manipulation}
+
+#let's load a simple map
+library(tidycensus)
+
+census_api_key("0d539976d5203a96fa55bbf4421110d4b3db3648")# you must acquired your own key at http://api.census.gov/data/key_signup.html
+
+bexar_medincome <- get_acs(geography = "tract", variables = "B19013_001",
+                state = "TX", county = "Bexar", geometry = TRUE)
+
+bexar_medincome
+
+plot(bexar_medincome)
+
+
+#merge SA_OI data with the map
+
+head(SA_OI) ; head(bexar_medincome)
+
+SA_OI[,GEOID:=paste0(state,"0",county,tract)] #creating a GEOID variable to have a common variable between the two data sets
+
+#check variable classes
+
+class(bexar_medincome$GEOID)
+class(SA_OI$GEOID)
+
+table(bexar_medincome$GEOID %in%  SA_OI$GEOID) # checking overlap
+
+
+# merge/join by GEOIDS
+bexar_medincome2<-merge(bexar_medincome,SA_OI,by="GEOID")
+
+
+#plotting
+
+plot(bexar_medincome2[,"med_hhinc_growth1990_2006"])# fast plotting
+
+library(ggplot2);library(viridis) # prettier plotting
+ggplot(bexar_medincome2)+
+  geom_sf(aes(fill=med_hhinc_growth1990_2006))+
+  scale_fill_viridis(option = "magma") +
+  scale_color_viridis(option = "magma")
+
+library(leaflet) # dynamic plotting
+
+pal <- colorQuantile("YlOrRd", domain = bexar_medincome2$med_hhinc_growth1990_2006, n = 5)
+
+leaflet(bexar_medincome2)%>%
+  addProviderTiles(provider = providers$CartoDB.Positron)%>%
+  addPolygons(fillColor = ~pal(med_hhinc_growth1990_2006),label = ~med_hhinc_growth1990_2006,color=~pal(med_hhinc_growth1990_2006),fillOpacity = 0.5,weight = 0.1)%>%
+  addLegend(pal = pal,values = ~med_hhinc_growth1990_2006,opacity = 1)
+
+```
+
+
+
+### Part 2: Indentifying key housing issues and data gaps 
+
+###### Exploratory data analysis
+
+The objective of an Exploratory Data Analysis (EDA) is to explore and reveal relationships between variables available in the data as a way to provide initial insights on how a particular dataset can be useful to inform the researcher about a particular problem. 
+
+In housing analysis, we know that there are two main types of variables that we may be able to acquire data about:
+
+  1. Housing sympthoms variables: Variables that provide information about a sympthom or issue directly related to the health status of a housing market. Examples of these variables are: 
+    - Affordability Index: assess the levels of affordability in a particular area (can be defined in many ways) - housing demand
+    - New construction starts: assess the levels of dynamism of housing supply
+    - Housing prices: asssess the level of housing demand
+    - Housing tenure rates: assess the status of housing demand between the sales and renting market
+    - Eviction/ foreclosure counts: assess the level of how critical is a household' housing situation 
+  
+  2.Housing exogenous forces: variables that provide information about socio-economic forces that affect the housing market, but are normally contextual and outside of the control of planning/housing actors. Examples of these variables are:
+    - Employment/Unemployment: Variables related to job creation or destruction.
+    - Private investment: variables related the private companies investing in land aquisition or job creation
+    - Interest rates: indicator of how attractive can be the mortgage sector
+    - Mortgage placements: variables related to the lending market
+    - Insurance variables: variables related to how the insurance market is covering housing market mortgages/rental leases
+    - Climate related variables: variables related to climate events affecting the housing market (e.g., flooding maps, etc.)
+    - Demographic variables: variables that alone don't tell much about housing, but need to be spatially referenced or combined with other housing variables to do so.
+
+
+_Excercise 1_: Let's create two objects listing the variables according to the to previous groups. Then create a `data.table` object for each of the variable types.     
+
+```{r OI Variable filtering, echo=FALSE}
+names(d1)
+
+
+```
+
+
+_Excercise 2_: Alternativelly, in the case we want to keep all variables in the same object, how can we identify them?      
+
+```{r OI Variable rename, echo=FALSE}
+names(d1)
+
+
+```
+
+
+Now that we have classified the variables by their type, we can start exploring what relations could be present in the data. This is a recursive process that entails going over the following questions:
+
+  1. What problem I would like to seek/visualize in the data?
+  2. What is the hipothesis behind? 
+  3. What variables do I have in my data to visualize that hipothesis?
+  4. Are the variables in the right format? or do I need to do data manipulation?
+  5. What is the best way to display the data to inform about the problem, issue?
+  6. If the resulting product (table/map/figure/graph/etc.) informative of the issue? 
+  7. Go back to question 1 and 2 and see if you achieved the objective.
+
+
+
+##### Housing issue 1: Urban segregation
+
+
+
+
+##### Housing issue 2: 
