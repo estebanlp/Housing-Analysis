@@ -1,0 +1,65 @@
+---
+title: "Lab 2 - Data Management for Housing Analysis"
+author: |
+  | **Esteban Lopez Ochoa**
+  | *URP 5313 - Urban Housing Policy and Analysis*
+  | University of Texas at San Antonio
+date: "10/13/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The objective of this lab is to provide an overview of the main methods to import, manipulate and analyze data related to housing issues. This lab is organized in three parts:
+
+- Part 1: Using & manipulating data from an external source
+- Part 2: Indentifying key housing issues and data gaps
+- Part 3: Using & manipulating data from a government API
+
+BY the end of this lab, the student is expected to have a broad knowledge and basic hands on experience of the methods to import and analyse data relating to housing issues.
+
+
+### Part 1: Using data from an external source
+
+Data is comonly first downloaded from an external source and then loaded into R for procesing. This script shows how to load data from an external source and how to process it in order to create outputs (i.e. maps, tables, etc.) that will serve to inform policymaking.
+
+###### Data Source: The Opportunity Insights Project
+
+Opportunity insights is a not-for-profit organization directed by Prof. Raj Chetty (Harvard University) developed with the aim to **"...identify barriers to economic opportunity..."**. As housing scholars, we know that for a increasingly larger portion of the population, housing is a steping stone over which famkilies can build wealth and create stability and opportunities for their families. Hence much of the barriers to economic opportunities identified in the OI project overlap with the barriers for attaining a health housing situation. In specific the neighborhood dimension of the OI project contains many important findings that can provide useful insights when embarking in a housing analysis journey (see more in: https://opportunityinsights.org/neighborhoods/)
+
+For our excercise, we will use the neighborhood variables at the census tract level.This data set can be downloaded manually from:https://opportunityinsights.org/data/, by selecting `census tract` geographic level and then downloading the excel file for 'Neighborhood characteris by Census Tracts'. Alternativelly, the data can be directedly downloaded and imported directly using the following:
+
+```{r OI Data Import}
+library(data.table)
+
+d1<-fread("https://opportunityinsights.org/wp-content/uploads/2018/10/tract_covariates.csv")
+d2<-fread("tract_covariates.csv")
+
+identical(d1,d2)
+rm(d2)
+```
+
+Always it is useful to have a good idea of the strcuture of the data, namely, what variables are there available, what format are they stored, and what limitations (i.e. missing, incomplete cases, etc.) the data might have. This can be achieve by: 
+
+1. Looking at the data source metadata. In the case of the OI data this information can be found at: https://opportunityinsights.org/wp-content/uploads/2019/07/Codebook-for-Table-9.pdf 
+2. Looking at the structure of the imported data and corroborating if all variables were imported correctinly, this can be done by:
+
+
+```{r OI data structure}
+str(d1) # provides a general structure of the data (variable names, type, forst 6 observations)
+
+summary(d1) # provides a detailed summary statistic by variable (inlcuding the presence of NA's)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
