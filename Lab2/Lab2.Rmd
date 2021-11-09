@@ -89,7 +89,7 @@ library(tidycensus)
 census_api_key("0d539976d5203a96fa55bbf4421110d4b3db3648")# you must acquired your own key at http://api.census.gov/data/key_signup.html
 
 bexar_medincome <- get_acs(geography = "tract", variables = "B19013_001",
-                state = "TX", county = "Bexar", geometry = TRUE)
+                state = "TX", county = "Bexar", geometry = TRUE,year = 2019)
 
 bexar_medincome
 
@@ -126,12 +126,12 @@ ggplot(bexar_medincome2)+
 
 library(leaflet) # dynamic plotting
 
-pal <- colorQuantile("YlOrRd", domain = bexar_medincome2$med_hhinc_growth1990_2006, n = 5)
+pal <- colorQuantile("YlOrRd", domain = bexar_medincome2$med_hhinc_growth1990_2006,n = 5)
 
 leaflet(bexar_medincome2)%>%
   addProviderTiles(provider = providers$CartoDB.Positron)%>%
   addPolygons(fillColor = ~pal(med_hhinc_growth1990_2006),label = ~med_hhinc_growth1990_2006,color=~pal(med_hhinc_growth1990_2006),fillOpacity = 0.5,weight = 0.1)%>%
-  addLegend(pal = pal,values = ~med_hhinc_growth1990_2006,opacity = 1)
+  addLegend(pal = pal,values = ~med_hhinc_growth1990_2006,opacity = 1,title = "Income Growth 1990-2016",labels = c("a","b","c","d","e"))
 
 ```
 

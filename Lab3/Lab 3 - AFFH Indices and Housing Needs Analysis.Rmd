@@ -1,0 +1,178 @@
+---
+title: 'Lab 3: AFFH Indices and Housing Needs Analysis'
+author: |
+  | **Esteban Lopez Ochoa**
+  | *URP 5313 - Urban Housing Policy and Analysis*
+  | The University of Texas at San Antonio
+date: "11/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Demographics
+
+According to the AFFH Rule, Local Governments neeed to conduct "Describe demographic patterns in the jurisdiction and region, and describe trends over time (since 1990)." In particular, the first 3 analysis Local Governments are asked to do are: 
+
+  a. Describe and compare segregation levels in the jurisdiction and region. Identify the racial/ethnic groups that experience the highest levels of segregation.
+  b. Identify areas in the jurisdiction and region with relatively high segregation and integration by race/ethnicity, national origin, or LEP group, and indicate the predominant groups living in each area.
+  c. Explain how these segregation levels and patterns in the jurisdiction and region have changed over time (since 1990).
+  d. Consider and describe the location of owner and renter occupied housing in the jurisdiction and region in determining whether such housing is located in segregated or integrated areas, and describe trends over time
+  e. Discuss whether there are any demographic trends, policies, or practices that could lead to higher segregation in the jurisdiction in the future. Participants should focus on patterns that affect the jurisdiction and region rather than creating an inventory of local laws, policies, or practices.
+
+In order to achieve this goal, the HUD's AFFH mapping tool provides density dot maps by race/ethnicity from the 2010 Decenial Census in two versions, one that shows only the latest data (2010) and the `trends` option that allows to see past censuses as a way to look for trends. However, these tools are likely to deliver dated and biased analysis given that no access to the 2020 census is available (or even the 2019 ACS estimates), but more importanly, because density dot maps are not suitable to obtain relable demographic patterns given that they leave an important portion of the analysis to the 'eye' of the analyst.
+
+Bellow there are a set of maps with alternatives to analyze and indentify demographic patterns and trends using more updated data sources as well as more appropiate visualizations and indices.
+
+```{r Demographics}
+library(tidycensus)
+library(tidyverse)
+library(tigris)
+library(tmap) #install.packages('tmap')
+census_api_key("0d539976d5203a96fa55bbf4421110d4b3db3648")# you must acquired your own key at http://api.census.gov/data/key_signup.html
+
+#downloading the 2020 decenial census data
+
+load_variables(year = 2020,'pl',cache = T)
+
+#downloading the ACS 2019 data
+bexar_race <- get_decennial(
+  year = 2020,
+  geography = "tract",
+  state = "TX",
+  county = "Bexar",
+  variables = c(White = "B03002_003",
+                Black = "B03002_004",
+                Native = "B03002_005",
+                Asian = "B03002_006",
+                Hispanic = "B03002_012"),
+  summary_var = "B03002_001",
+  geometry = TRUE
+) %>%
+  mutate(percent = 100 * (estimate / summary_est)) # Code extracted and adapted from Walker (2021) 
+
+# Choroplet map with distribution of racial concentrations
+tm_shape(bexar_race,
+         projection = sf::st_crs(26915)) + 
+  tm_facets(by = "variable", scale.factor = 4) + 
+  tm_fill(col = "percent",
+          style = "quantile",
+          n = 6,
+          palette = "Blues",
+          title = "Percent \n(2015-2019 ACS)",) + 
+  tm_layout(bg.color = "grey", 
+            legend.position = c(-0.7, 0.2),
+            panel.label.bg.color = "white")
+
+# Choroplet map to analyse a particular race and its distribution
+bexar_hispanic <- filter(bexar_race, 
+                         variable == "Hispanic")
+
+tm_shape(bexar_hispanic, 
+         projection = sf::st_crs(26915)) + 
+  tm_polygons(col = "percent",
+          style = "jenks",
+          n = 5,
+          palette = "Purples",
+          title = "ACS estimate",
+          legend.hist = TRUE) + 
+  tm_layout(title = "Percent Hispanic\nby Census tract",
+            frame = FALSE,
+            legend.outside = TRUE,
+            bg.color = "grey70",
+            legend.hist.width = 5,
+            fontfamily = "Verdana")
+
+
+# Dot Density Map
+library(sf)
+
+groups <- unique(bexar_race$variable)
+
+bexar_dots <- map_dfr(groups, ~{
+  bexar_race %>%
+    filter(variable == .x) %>%
+    st_transform(26915) %>%
+    mutate(est100 = as.integer(estimate / 100)) %>%
+    st_sample(size = .$est100, exact = FALSE) %>%
+    st_sf() %>%
+    mutate(group = .x)
+}) %>%
+  slice_sample(prop = 0.5)
+
+background_tracts <- filter(bexar_race, variable == "White")
+
+tm_shape(background_tracts, 
+         projection = sf::st_crs(26915)) + 
+  tm_polygons(col = "white", 
+              border.col = "grey") + 
+  tm_shape(bexar_dots) +
+  tm_dots(col = "group", 
+          palette = "Set1",
+          size = 0.005, 
+          title = "Race/ethnicity")
+
+
+# Bubble Map
+
+tm_shape(bexar_race,
+         projection = sf::st_crs(26915)) + 
+  tm_polygons() +
+  tm_facets(by = "variable", scale.factor = 4) + 
+  tm_bubbles(size = "estimate", alpha = 0.5, 
+             col = "navy",
+             title.size = "Population by race \nACS 2019 5y estimate") + 
+  tm_layout(bg.color = "grey", 
+            legend.position = c(-0.7, 0.2),
+            panel.label.bg.color = "white")
+
+
+# Neighborhood Diversity Index  (Maly, 2016, Journal of Urban Affairs)
+#https://www.tandfonline.com/doi/abs/10.1111/0735-2166.00038 
+
+library(data.table)
+
+bexar_race2<-data.table(bexar_race)
+
+bexar_race2[,county_estimate:=sum(estimate,na.rm = T),by=.(variable)]
+bexar_race2[,county_percent:=county_estimate/sum(estimate,na.rm = T)]
+
+bexar_race2[,NDI_diff:=abs(county_percent-percent)]
+bexar_race2[,NDI:=0.5*(sum(NDI_diff))/100,by=.(GEOID)]
+summary(bexar_race2$NDI)
+
+bexar_race2<-st_sf(bexar_race2)
+
+tm_shape(bexar_race2, 
+         projection = sf::st_crs(26915)) + 
+  tm_polygons(col = "NDI",
+          style = "jenks",
+          n = 5,
+          palette = "-Reds",
+          title = "Neighborhood Diversity Index (NDI)",
+          legend.hist = TRUE) + 
+  tm_layout(
+            frame = FALSE,
+            legend.outside = TRUE,
+            bg.color = "grey70",
+            legend.hist.width = 5,
+            fontfamily = "Verdana")
+
+```
+
+
+
+
+## Loading HUD's AFFH data
+
+
+
+```{r HUD AFFH, echo=FALSE}
+library(data.table)
+HUD<-fread("https://www.hud.gov/sites/dfiles/FHEO/documents/AFFHT0006-AFFH-Raw-Data-July2020_0.zip")
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
