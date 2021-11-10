@@ -27,43 +27,60 @@ In order to achieve this goal, the HUD's AFFH mapping tool provides density dot 
 Bellow there are a set of maps with alternatives to analyze and indentify demographic patterns and trends using more updated data sources as well as more appropiate visualizations and indices.
 
 ```{r Demographics}
-library(tidycensus)
+library(tidycensus) # install.packages('tidycensus') version 1.1 needs to be installed
 library(tidyverse)
 library(tigris)
 library(tmap) #install.packages('tmap')
-census_api_key("0d539976d5203a96fa55bbf4421110d4b3db3648")# you must acquired your own key at http://api.census.gov/data/key_signup.html
+census_api_key("0d539976d5203a96fa55bbf4421110d4b3db3648",install = T,overwrite = T)# you must acquired your own key at http://api.census.gov/data/key_signup.html
 
 #downloading the 2020 decenial census data
 
-load_variables(year = 2020,'pl',cache = T)
+View(load_variables(year = 2020,dataset = 'pl',cache = T))
 
-#downloading the ACS 2019 data
 bexar_race <- get_decennial(
   year = 2020,
   geography = "tract",
   state = "TX",
   county = "Bexar",
-  variables = c(White = "B03002_003",
-                Black = "B03002_004",
-                Native = "B03002_005",
-                Asian = "B03002_006",
-                Hispanic = "B03002_012"),
-  summary_var = "B03002_001",
+  variables = c(White = "P2_005N",
+                Black = "P2_006N",
+                Native = "P2_007N",
+                Asian = "P2_008N",
+                Islander ="P2_009N",
+                Hispanic = "P2_002N"),
+  summary_var = "P2_001N",
   geometry = TRUE
 ) %>%
-  mutate(percent = 100 * (estimate / summary_est)) # Code extracted and adapted from Walker (2021) 
+  mutate(percent = 100 * (value / summary_value)) # Code extracted and adapted from Walker (2021) 
+
+
+#The same can be achieved by downloading the ACS 2019 data
+# bexar_race <- get_acs(
+#   year = 2019,
+#   geography = "tract",
+#   state = "TX",
+#   county = "Bexar",
+#   variables = c(White = "B03002_003",
+#                 Black = "B03002_004",
+#                 Native = "B03002_005",
+#                 Asian = "B03002_006",
+#                 Hispanic = "B03002_012"),
+#   summary_var = "B03002_001",
+#   geometry = TRUE
+# ) %>%
+#   mutate(percent = 100 * (estimate / summary_est)) # Code extracted and adapted from Walker (2021) 
 
 # Choroplet map with distribution of racial concentrations
 tm_shape(bexar_race,
          projection = sf::st_crs(26915)) + 
   tm_facets(by = "variable", scale.factor = 4) + 
   tm_fill(col = "percent",
-          style = "quantile",
-          n = 6,
+          style = "jenks",
+          n = 5,
           palette = "Blues",
-          title = "Percent \n(2015-2019 ACS)",) + 
+          title = "Percent \n2020 Decenial Census") + 
   tm_layout(bg.color = "grey", 
-            legend.position = c(-0.7, 0.2),
+            legend.outside = T,
             panel.label.bg.color = "white")
 
 # Choroplet map to analyse a particular race and its distribution
@@ -76,7 +93,7 @@ tm_shape(bexar_hispanic,
           style = "jenks",
           n = 5,
           palette = "Purples",
-          title = "ACS estimate",
+          title = "2020 Decenial Census",
           legend.hist = TRUE) + 
   tm_layout(title = "Percent Hispanic\nby Census tract",
             frame = FALSE,
@@ -95,7 +112,7 @@ bexar_dots <- map_dfr(groups, ~{
   bexar_race %>%
     filter(variable == .x) %>%
     st_transform(26915) %>%
-    mutate(est100 = as.integer(estimate / 100)) %>%
+    mutate(est100 = as.integer(value / 100)) %>%
     st_sample(size = .$est100, exact = FALSE) %>%
     st_sf() %>%
     mutate(group = .x)
@@ -121,11 +138,11 @@ tm_shape(bexar_race,
          projection = sf::st_crs(26915)) + 
   tm_polygons() +
   tm_facets(by = "variable", scale.factor = 4) + 
-  tm_bubbles(size = "estimate", alpha = 0.5, 
+  tm_bubbles(size = "value", alpha = 0.5, 
              col = "navy",
-             title.size = "Population by race \nACS 2019 5y estimate") + 
+             title.size = "Population by race \n2020 Decenial Census") + 
   tm_layout(bg.color = "grey", 
-            legend.position = c(-0.7, 0.2),
+            legend.outside = T,
             panel.label.bg.color = "white")
 
 
@@ -136,8 +153,8 @@ library(data.table)
 
 bexar_race2<-data.table(bexar_race)
 
-bexar_race2[,county_estimate:=sum(estimate,na.rm = T),by=.(variable)]
-bexar_race2[,county_percent:=county_estimate/sum(estimate,na.rm = T)]
+bexar_race2[,county_value:=sum(value,na.rm = T),by=.(variable)]
+bexar_race2[,county_percent:=county_value/sum(value,na.rm = T)]
 
 bexar_race2[,NDI_diff:=abs(county_percent-percent)]
 bexar_race2[,NDI:=0.5*(sum(NDI_diff))/100,by=.(GEOID)]
@@ -145,12 +162,12 @@ summary(bexar_race2$NDI)
 
 bexar_race2<-st_sf(bexar_race2)
 
-tm_shape(bexar_race2, 
+map1<-tm_shape(bexar_race2, 
          projection = sf::st_crs(26915)) + 
   tm_polygons(col = "NDI",
           style = "jenks",
           n = 5,
-          palette = "-Reds",
+          palette = "viridis",
           title = "Neighborhood Diversity Index (NDI)",
           legend.hist = TRUE) + 
   tm_layout(
@@ -160,9 +177,31 @@ tm_shape(bexar_race2,
             legend.hist.width = 5,
             fontfamily = "Verdana")
 
+tmap_leaflet(map1,alpha=0.5)
+
 ```
 
 
+###Temporal analysys
+
+```{r Demographics 2}
+#View(load_variables(year = 2010,dataset = 'pl',cache = T))
+
+bexar_race_2010 <- get_decennial(
+  year = 2010,
+  geography = "tract",
+  state = "TX",
+  county = "Bexar",
+  variables = c(White = "H007003",
+                Black = "H007004",
+                Native = "H007005",
+                Asian = "H007006",
+                Islander ="H007007",
+                Hispanic = "H007001"),
+  summary_var = "P002001",
+  geometry = TRUE
+)
+```
 
 
 ## Loading HUD's AFFH data

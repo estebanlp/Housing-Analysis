@@ -53,7 +53,7 @@ v19_acs <- load_variables(2019, "acs5", cache = TRUE)
 View(v19_acs)
 
 # 2010 Census variables
-v2010_census<-load_variables(2020,dataset = 'sf1',cache = T)
+v2010_census<-load_variables(2010,dataset = 'sf1',cache = T)
 View(v2010_census)
 ```
 
