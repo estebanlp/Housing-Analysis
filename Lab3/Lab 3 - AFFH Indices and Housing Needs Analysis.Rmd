@@ -200,18 +200,78 @@ bexar_race_2010 <- get_decennial(
                 Hispanic = "H007001"),
   summary_var = "P002001",
   geometry = TRUE
-)
+) %>%
+  mutate(percent = 100 * (value / summary_value))
+
+#merging 2020 and 2010 data
+bexar_race_trend<-merge(data.table(bexar_race2),data.table(bexar_race_2010),by=c("GEOID","variable"))
+
+#calculating 2010's NDI
+bexar_race_trend[,county_value_2010:=sum(value.y,na.rm = T),by=.(variable)]
+bexar_race_trend[,county_percent_2010:=county_value_2010/sum(value.y,na.rm = T)]
+
+bexar_race_trend[,NDI_diff_2010:=abs(county_percent_2010-percent.y)]
+bexar_race_trend[,NDI_2010:=0.5*(sum(NDI_diff_2010))/100,by=.(GEOID)]
+summary(bexar_race_trend[,.(NDI,NDI_2010)])
+
+#calculating growth rates by race
+bexar_race_trend[,Growth_rate:=((value.x-value.y)/value.y)*100]
+
+#calculating NDI differences
+bexar_race_trend[,NDI_Var:=NDI-NDI_2010]
+
+
+bexar_race_trend<-st_sf(bexar_race_trend)
+
+map2<-tm_shape(bexar_race_trend, 
+         projection = sf::st_crs(26915)) + 
+  tm_polygons(col = "NDI_2010",
+          style = "jenks",
+          n = 5,
+          palette = "viridis",
+          title = "Neighborhood Diversity Index (NDI)\n 2010",
+          legend.hist = TRUE) + 
+  tm_layout(
+            frame = FALSE,
+            legend.outside = TRUE,
+            bg.color = "grey70",
+            legend.hist.width = 5,
+            fontfamily = "Verdana")
+
+map2
+
+
+map3<-tm_shape(bexar_race_trend, 
+         projection = sf::st_crs(26915)) + 
+  tm_polygons(col = "NDI_Var",
+          style = "jenks",
+          n = 5,
+          palette = "viridis",
+          title = "Neighborhood Diversity Index (NDI)\n 2020-2010 Difference",
+          legend.hist = TRUE) + 
+  tm_layout(
+            frame = FALSE,
+            legend.outside = TRUE,
+            bg.color = "grey70",
+            legend.hist.width = 5,
+            fontfamily = "Verdana")
+
+map3
+
+
+
+tm_shape(bexar_race,
+         projection = sf::st_crs(26915)) + 
+  tm_polygons() +
+  tm_facets(by = "variable", scale.factor = 4) + 
+  tm_bubbles(size = "value", alpha = 0.5, 
+             col = "navy",
+             title.size = "Population by race \n2020 Decenial Census") + 
+  tm_layout(bg.color = "grey", 
+            legend.outside = T,
+            panel.label.bg.color = "white")
+
 ```
 
 
-## Loading HUD's AFFH data
-
-
-
-```{r HUD AFFH, echo=FALSE}
-library(data.table)
-HUD<-fread("https://www.hud.gov/sites/dfiles/FHEO/documents/AFFHT0006-AFFH-Raw-Data-July2020_0.zip")
-
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+As it can be seen, better information can be extracted from using the full extend of the available data.
