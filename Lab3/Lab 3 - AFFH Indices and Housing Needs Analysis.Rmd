@@ -259,6 +259,8 @@ map3<-tm_shape(bexar_race_trend,
 
 map3
 
+library(mapview)
+mapview(bexar_race_trend,zcol="NDI_Var", at=c(-0.5,-0.3,-0.1,0,0.1,0.3,0.5))
 ```
 
 
