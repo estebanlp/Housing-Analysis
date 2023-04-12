@@ -4,7 +4,7 @@ author: |
   | **Esteban Lopez Ochoa**
   | *URP 5313 - Urban Housing Policy and Analysis*
   | The University of Texas at San Antonio
-date: "11/9/2021"
+date: "04/12/2023"
 output: html_document
 ---
 
@@ -33,7 +33,7 @@ library(tigris)
 library(tmap) #install.packages('tmap')
 census_api_key("0d539976d5203a96fa55bbf4421110d4b3db3648")# you must acquired your own key at http://api.census.gov/data/key_signup.html
 
-#downloading the 2020 decenial census data
+#downloading the 2020 decennial census data
 
 View(load_variables(year = 2020,dataset = 'pl',cache = T))
 
@@ -167,20 +167,18 @@ map1<-tm_shape(bexar_race2,
          projection = sf::st_crs(26915)) + 
   tm_polygons(col = "NDI",
           style = "jenks",
-          n = 5,
+          n = 5,alpha = 0.5,
           palette = "viridis",
-          title = "Neighborhood Diversity Index (NDI)",
-          legend.hist = TRUE) + 
+          title = "Racial\nDiversity Index (NDI)",
+          legend.hist = F) + 
   tm_layout(
             frame = FALSE,
             legend.outside = TRUE,
-            bg.color = "grey70",
-            legend.hist.width = 5,
             fontfamily = "Verdana")
 
 map1
 
-tmap_leaflet(map1,alpha=0.5)
+tmap_leaflet(map1,opacity = 0.4)
 
 ```
 
@@ -248,7 +246,7 @@ map3<-tm_shape(bexar_race_trend,
          projection = sf::st_crs(26915)) + 
   tm_polygons(col = "NDI_Var",
           style = "jenks",
-          n = 5,
+          n = 3,
           palette = "viridis",
           title = "Neighborhood Diversity Index (NDI)\n 2020-2010 Difference",
           legend.hist = TRUE) + 
@@ -260,19 +258,6 @@ map3<-tm_shape(bexar_race_trend,
             fontfamily = "Verdana")
 
 map3
-
-
-
-tm_shape(bexar_race,
-         projection = sf::st_crs(26915)) + 
-  tm_polygons() +
-  tm_facets(by = "variable", scale.factor = 4) + 
-  tm_bubbles(size = "value", alpha = 0.5, 
-             col = "navy",
-             title.size = "Population by race \n2020 Decenial Census") + 
-  tm_layout(bg.color = "grey", 
-            legend.outside = T,
-            panel.label.bg.color = "white")
 
 ```
 
